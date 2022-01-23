@@ -98,11 +98,16 @@ pub mod descriptor_proto {
         pub end: ::core::option::Option<i32>,
     }
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+#[derive(Clone, PartialEq, ::prost::Message, ::prost::Extendable)]
 pub struct ExtensionRangeOptions {
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
     pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    #[prost(extension_set)]
+    pub extension_set: ::prost::ExtensionSet<Self>,
+}
+impl ExtensionRangeOptions {
+    const EXTENDABLE_TYPE_ID: &'static str = ".google.protobuf.ExtensionRangeOptions";
 }
 /// Describes a field within a message.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -173,17 +178,7 @@ pub struct FieldDescriptorProto {
 }
 /// Nested message and enum types in `FieldDescriptorProto`.
 pub mod field_descriptor_proto {
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Type {
         /// 0 is reserved for errors.
@@ -247,17 +242,7 @@ pub mod field_descriptor_proto {
             }
         }
     }
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Label {
         /// 0 is reserved for errors
@@ -300,9 +285,7 @@ pub struct EnumDescriptorProto {
     /// by enum values in the same enum declaration. Reserved ranges may not
     /// overlap.
     #[prost(message, repeated, tag = "4")]
-    pub reserved_range: ::prost::alloc::vec::Vec<
-        enum_descriptor_proto::EnumReservedRange,
-    >,
+    pub reserved_range: ::prost::alloc::vec::Vec<enum_descriptor_proto::EnumReservedRange>,
     /// Reserved enum value names, which may not be reused. A given name may only
     /// be reserved once.
     #[prost(string, repeated, tag = "5")]
@@ -366,36 +349,39 @@ pub struct MethodDescriptorProto {
     #[prost(bool, optional, tag = "6", default = "false")]
     pub server_streaming: ::core::option::Option<bool>,
 }
-/// Each of the definitions above may have "options" attached.  These are
-/// just annotations which may cause code to be generated slightly differently
-/// or may contain hints for code that manipulates protocol messages.
-///
-/// Clients may define custom options as extensions of the \*Options messages.
-/// These extensions may not yet be known at parsing time, so the parser cannot
-/// store the values in them.  Instead it stores them in a field in the \*Options
-/// message called uninterpreted_option. This field must have the same name
-/// across all \*Options messages. We then use this field to populate the
-/// extensions when we build a descriptor, at which point all protos have been
-/// parsed and so all extensions are known.
-///
-/// Extension numbers for custom options may be chosen as follows:
-///
-/// * For options which will only be used within a single application or
-///   organization, or for experimental options, use field numbers 50000
-///   through 99999.  It is up to you to ensure that you do not use the
-///   same number for multiple options.
-/// * For options which will be published and used publicly by multiple
-///   independent entities, e-mail protobuf-global-extension-registry@google.com
-///   to reserve extension numbers. Simply provide your project name (e.g.
-///   Objective-C plugin) and your project website (if available) -- there's no
-///   need to explain how you intend to use them. Usually you only need one
-///   extension number. You can declare multiple options with only one extension
-///   number by putting them in a sub-message. See the Custom Options section of
-///   the docs for examples:
-///   <https://developers.google.com/protocol-buffers/docs/proto#options>
-///   If this turns out to be popular, a web service will be set up
-///   to automatically assign option numbers.
-#[derive(Clone, PartialEq, ::prost::Message)]
+// ===================================================================
+// Options
+
+// Each of the definitions above may have "options" attached.  These are
+// just annotations which may cause code to be generated slightly differently
+// or may contain hints for code that manipulates protocol messages.
+//
+// Clients may define custom options as extensions of the *Options messages.
+// These extensions may not yet be known at parsing time, so the parser cannot
+// store the values in them.  Instead it stores them in a field in the *Options
+// message called uninterpreted_option. This field must have the same name
+// across all *Options messages. We then use this field to populate the
+// extensions when we build a descriptor, at which point all protos have been
+// parsed and so all extensions are known.
+//
+// Extension numbers for custom options may be chosen as follows:
+// * For options which will only be used within a single application or
+//   organization, or for experimental options, use field numbers 50000
+//   through 99999.  It is up to you to ensure that you do not use the
+//   same number for multiple options.
+// * For options which will be published and used publicly by multiple
+//   independent entities, e-mail protobuf-global-extension-registry@google.com
+//   to reserve extension numbers. Simply provide your project name (e.g.
+//   Objective-C plugin) and your project website (if available) -- there's no
+//   need to explain how you intend to use them. Usually you only need one
+//   extension number. You can declare multiple options with only one extension
+//   number by putting them in a sub-message. See the Custom Options section of
+//   the docs for examples:
+//   <https://developers.google.com/protocol-buffers/docs/proto#options>
+//   If this turns out to be popular, a web service will be set up
+//   to automatically assign option numbers.
+
+#[derive(Clone, PartialEq, ::prost::Message, ::prost::Extendable)]
 pub struct FileOptions {
     /// Sets the Java package where classes generated from this .proto will be
     /// placed.  By default, the proto package is used, but this is often
@@ -509,21 +495,13 @@ pub struct FileOptions {
     /// See the documentation for the "Options" section above.
     #[prost(message, repeated, tag = "999")]
     pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    #[prost(extension_set)]
+    pub extension_set: ::prost::ExtensionSet<Self>,
 }
 /// Nested message and enum types in `FileOptions`.
 pub mod file_options {
     /// Generated classes can be optimized for speed or code size.
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum OptimizeMode {
         /// Generate complete code for parsing, serialization,
@@ -549,7 +527,10 @@ pub mod file_options {
         }
     }
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+impl FileOptions {
+    const EXTENDABLE_TYPE_ID: &'static str = ".google.protobuf.FileOptions";
+}
+#[derive(Clone, PartialEq, ::prost::Message, ::prost::Extendable)]
 pub struct MessageOptions {
     /// Set true to use the old proto1 MessageSet wire format for extensions.
     /// This is provided for backwards-compatibility with the MessageSet wire
@@ -608,8 +589,13 @@ pub struct MessageOptions {
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
     pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    #[prost(extension_set)]
+    pub extension_set: ::prost::ExtensionSet<Self>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+impl MessageOptions {
+    const EXTENDABLE_TYPE_ID: &'static str = ".google.protobuf.MessageOptions";
+}
+#[derive(Clone, PartialEq, ::prost::Message, ::prost::Extendable)]
 pub struct FieldOptions {
     /// The ctype option instructs the C++ code generator to use a different
     /// representation of the field than it normally would.  See the specific
@@ -688,20 +674,12 @@ pub struct FieldOptions {
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
     pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    #[prost(extension_set)]
+    pub extension_set: ::prost::ExtensionSet<Self>,
 }
 /// Nested message and enum types in `FieldOptions`.
 pub mod field_options {
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum CType {
         /// Default mode.
@@ -722,17 +700,7 @@ pub mod field_options {
             }
         }
     }
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum JsType {
         /// Use the default type.
@@ -756,13 +724,21 @@ pub mod field_options {
         }
     }
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+impl FieldOptions {
+    const EXTENDABLE_TYPE_ID: &'static str = ".google.protobuf.FieldOptions";
+}
+#[derive(Clone, PartialEq, ::prost::Message, ::prost::Extendable)]
 pub struct OneofOptions {
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
     pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    #[prost(extension_set)]
+    pub extension_set: ::prost::ExtensionSet<Self>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+impl OneofOptions {
+    const EXTENDABLE_TYPE_ID: &'static str = ".google.protobuf.OneofOptions";
+}
+#[derive(Clone, PartialEq, ::prost::Message, ::prost::Extendable)]
 pub struct EnumOptions {
     /// Set this option to true to allow mapping different tag names to the same
     /// value.
@@ -777,8 +753,13 @@ pub struct EnumOptions {
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
     pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    #[prost(extension_set)]
+    pub extension_set: ::prost::ExtensionSet<Self>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+impl EnumOptions {
+    const EXTENDABLE_TYPE_ID: &'static str = ".google.protobuf.EnumOptions";
+}
+#[derive(Clone, PartialEq, ::prost::Message, ::prost::Extendable)]
 pub struct EnumValueOptions {
     /// Is this enum value deprecated?
     /// Depending on the target platform, this can emit Deprecated annotations
@@ -789,8 +770,13 @@ pub struct EnumValueOptions {
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
     pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    #[prost(extension_set)]
+    pub extension_set: ::prost::ExtensionSet<Self>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+impl EnumValueOptions {
+    const EXTENDABLE_TYPE_ID: &'static str = ".google.protobuf.EnumValueOptions";
+}
+#[derive(Clone, PartialEq, ::prost::Message, ::prost::Extendable)]
 pub struct ServiceOptions {
     /// Is this service deprecated?
     /// Depending on the target platform, this can emit Deprecated annotations
@@ -801,8 +787,13 @@ pub struct ServiceOptions {
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
     pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    #[prost(extension_set)]
+    pub extension_set: ::prost::ExtensionSet<Self>,
 }
-#[derive(Clone, PartialEq, ::prost::Message)]
+impl ServiceOptions {
+    const EXTENDABLE_TYPE_ID: &'static str = ".google.protobuf.ServiceOptions";
+}
+#[derive(Clone, PartialEq, ::prost::Message, ::prost::Extendable)]
 pub struct MethodOptions {
     /// Is this method deprecated?
     /// Depending on the target platform, this can emit Deprecated annotations
@@ -820,23 +811,15 @@ pub struct MethodOptions {
     /// The parser stores options it doesn't recognize here. See above.
     #[prost(message, repeated, tag = "999")]
     pub uninterpreted_option: ::prost::alloc::vec::Vec<UninterpretedOption>,
+    #[prost(extension_set)]
+    pub extension_set: ::prost::ExtensionSet<Self>,
 }
 /// Nested message and enum types in `MethodOptions`.
 pub mod method_options {
     /// Is this method side-effect-free (or safe in HTTP parlance), or idempotent,
     /// or neither? HTTP based RPC implementation may choose GET verb for safe
     /// methods, and PUT verb for idempotent methods instead of the default POST.
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum IdempotencyLevel {
         IdempotencyUnknown = 0,
@@ -858,6 +841,9 @@ pub mod method_options {
             }
         }
     }
+}
+impl MethodOptions {
+    const EXTENDABLE_TYPE_ID: &'static str = ".google.protobuf.MethodOptions";
 }
 /// A message representing a option the parser does not recognize. This only
 /// appears in options protos created by the compiler::Parser class.
@@ -1038,9 +1024,7 @@ pub mod source_code_info {
         #[prost(string, optional, tag = "4")]
         pub trailing_comments: ::core::option::Option<::prost::alloc::string::String>,
         #[prost(string, repeated, tag = "6")]
-        pub leading_detached_comments: ::prost::alloc::vec::Vec<
-            ::prost::alloc::string::String,
-        >,
+        pub leading_detached_comments: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     }
 }
 /// Describes the relationship between generated code and its original source
@@ -1273,17 +1257,7 @@ pub struct Field {
 /// Nested message and enum types in `Field`.
 pub mod field {
     /// Basic field types.
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Kind {
         /// Field type unknown.
@@ -1355,17 +1329,7 @@ pub mod field {
         }
     }
     /// Whether a field is optional, required, or repeated.
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Cardinality {
         /// For fields with unknown cardinality.
@@ -1958,10 +1922,7 @@ pub struct FieldMask {
 pub struct Struct {
     /// Unordered map of dynamically typed values.
     #[prost(btree_map = "string, message", tag = "1")]
-    pub fields: ::prost::alloc::collections::BTreeMap<
-        ::prost::alloc::string::String,
-        Value,
-    >,
+    pub fields: ::prost::alloc::collections::BTreeMap<::prost::alloc::string::String, Value>,
 }
 /// `Value` represents a dynamically typed value which can be either
 /// null, a number, a string, a boolean, a recursive struct value, or a
