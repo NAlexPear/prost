@@ -156,6 +156,7 @@ mod code_generator;
 mod extern_paths;
 mod ident;
 mod message_graph;
+mod parser;
 mod path;
 
 /// A service generator takes a service descriptor and generates Rust code.

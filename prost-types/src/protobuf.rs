@@ -180,17 +180,7 @@ pub struct FieldDescriptorProto {
 }
 /// Nested message and enum types in `FieldDescriptorProto`.
 pub mod field_descriptor_proto {
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Type {
         /// 0 is reserved for errors.
@@ -254,17 +244,7 @@ pub mod field_descriptor_proto {
             }
         }
     }
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Label {
         /// 0 is reserved for errors
@@ -309,9 +289,7 @@ pub struct EnumDescriptorProto {
     /// by enum values in the same enum declaration. Reserved ranges may not
     /// overlap.
     #[prost(message, repeated, tag = "4")]
-    pub reserved_range: ::prost::alloc::vec::Vec<
-        enum_descriptor_proto::EnumReservedRange,
-    >,
+    pub reserved_range: ::prost::alloc::vec::Vec<enum_descriptor_proto::EnumReservedRange>,
     /// Reserved enum value names, which may not be reused. A given name may only
     /// be reserved once.
     #[prost(string, repeated, tag = "5")]
@@ -527,17 +505,7 @@ pub struct FileOptions {
 /// Nested message and enum types in `FileOptions`.
 pub mod file_options {
     /// Generated classes can be optimized for speed or code size.
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum OptimizeMode {
         /// Generate complete code for parsing, serialization,
@@ -707,17 +675,7 @@ pub struct FieldOptions {
 }
 /// Nested message and enum types in `FieldOptions`.
 pub mod field_options {
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum CType {
         /// Default mode.
@@ -738,17 +696,7 @@ pub mod field_options {
             }
         }
     }
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum JsType {
         /// Use the default type.
@@ -847,17 +795,7 @@ pub mod method_options {
     /// Is this method side-effect-free (or safe in HTTP parlance), or idempotent,
     /// or neither? HTTP based RPC implementation may choose GET verb for safe
     /// methods, and PUT verb for idempotent methods instead of the default POST.
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum IdempotencyLevel {
         IdempotencyUnknown = 0,
@@ -1063,9 +1001,7 @@ pub mod source_code_info {
         #[prost(string, optional, tag = "4")]
         pub trailing_comments: ::core::option::Option<::prost::alloc::string::String>,
         #[prost(string, repeated, tag = "6")]
-        pub leading_detached_comments: ::prost::alloc::vec::Vec<
-            ::prost::alloc::string::String,
-        >,
+        pub leading_detached_comments: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
     }
 }
 /// Describes the relationship between generated code and its original source
@@ -1304,17 +1240,7 @@ pub struct Field {
 /// Nested message and enum types in `Field`.
 pub mod field {
     /// Basic field types.
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Kind {
         /// Field type unknown.
@@ -1386,17 +1312,7 @@ pub mod field {
         }
     }
     /// Whether a field is optional, required, or repeated.
-    #[derive(
-        Clone,
-        Copy,
-        Debug,
-        PartialEq,
-        Eq,
-        Hash,
-        PartialOrd,
-        Ord,
-        ::prost::Enumeration
-    )]
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, ::prost::Enumeration)]
     #[repr(i32)]
     pub enum Cardinality {
         /// For fields with unknown cardinality.
@@ -1496,6 +1412,7 @@ impl Syntax {
         }
     }
 }
+
 /// Api is a light-weight descriptor for an API Interface.
 ///
 /// Interfaces are also described as "protocol buffer services" in some contexts,
@@ -1998,10 +1915,7 @@ pub struct FieldMask {
 pub struct Struct {
     /// Unordered map of dynamically typed values.
     #[prost(btree_map = "string, message", tag = "1")]
-    pub fields: ::prost::alloc::collections::BTreeMap<
-        ::prost::alloc::string::String,
-        Value,
-    >,
+    pub fields: ::prost::alloc::collections::BTreeMap<::prost::alloc::string::String, Value>,
 }
 /// `Value` represents a dynamically typed value which can be either
 /// null, a number, a string, a boolean, a recursive struct value, or a
