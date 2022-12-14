@@ -1,62 +1,99 @@
+use super::{
+    comment, method,
+    source::{Span, Tag},
+};
 use nom::{
-    bytes::complete::{tag, take_till1},
-    character::complete::{alpha1, multispace0, multispace1},
+    bytes::complete::{tag, take_until},
+    character::complete::multispace0,
     multi::many0,
-    sequence::{delimited, pair, terminated, tuple},
+    sequence::{delimited, preceded},
     IResult,
 };
-use prost_types::{MethodDescriptorProto, ServiceDescriptorProto};
+use prost_types::{source_code_info::Location, ServiceDescriptorProto};
 
-/// Parse an rpc's input and output types from between parens
-fn parse_parenthetical(input: &str) -> IResult<&str, &str> {
-    delimited(
-        pair(tag("("), multispace0),
-        // FIXME: apply the rules for message names here
-        take_till1(|character: char| character == ')' || character.is_whitespace()),
-        pair(multispace0, tag(")")),
-    )(input)
+/// Path component for a [`Message`]
+/// derived from the `service` field's tag in [`FileDescriptorProto`]
+// FIXME: derive these tags directly from the FileDescriptorProto in prost_types
+pub(crate) struct TAG;
+
+impl Tag for TAG {
+    fn into_path(&self, locations: &[Location]) -> Vec<i32> {
+        let tag: i32 = self.into();
+
+        // service paths are indexed, since they're repeating fields
+        let next_service_index = locations
+            .iter()
+            .rev()
+            .find(|location| location.path.get(0) == Some(&tag))
+            .map(|location| location.path[1] + 1)
+            .unwrap_or(0);
+
+        vec![tag, next_service_index]
+    }
 }
 
-/// Parse an rpc into a [`MethodDescriptorProto`]
-fn parse_method(input: &str) -> IResult<&str, MethodDescriptorProto> {
-    let (input, (_, name, input_type, _, output_type, _)) = tuple((
-        tag("rpc"),
-        delimited(multispace1, alpha1, multispace0),
-        parse_parenthetical,
-        delimited(multispace1, tag("returns"), multispace1),
-        parse_parenthetical,
-        pair(multispace0, tag(";")),
-    ))(input)?;
+impl<'a> From<&'a TAG> for i32 {
+    fn from(_: &'a TAG) -> Self {
+        6
+    }
+}
 
-    Ok((
-        input,
-        MethodDescriptorProto {
-            name: Some(name.to_string()),
-            input_type: Some(input_type.to_string()),
-            output_type: Some(output_type.to_string()),
-            ..Default::default()
-        },
-    ))
+mod identifier {
+    use super::*;
+
+    /// Path component for any message with a `name` tag
+    #[derive(Clone, Copy)]
+    pub(crate) struct TAG;
+
+    impl Tag for TAG {
+        fn into_path(&self, locations: &[Location]) -> Vec<i32> {
+            // identifiers are always attached directly to parents
+            let parent = locations.iter().last().unwrap(); // FIXME: make fallible
+            let mut path = parent.path.clone();
+            path.push(self.into());
+            path
+        }
+    }
+
+    impl<'a> From<&'a TAG> for i32 {
+        fn from(_: &'a TAG) -> Self {
+            1
+        }
+    }
 }
 
 /// Parse a service into a [`ServiceDescriptorProto`]
-pub(crate) fn parse(input: &str) -> IResult<&str, ServiceDescriptorProto> {
-    let (input, (_, name, methods)) = tuple((
-        delimited(multispace0, tag("service"), multispace1),
-        terminated(alpha1, multispace0),
-        delimited(
-            pair(tag("{"), multispace0),
-            many0(parse_method),
-            pair(multispace0, tag("}")),
-        ),
-    ))(input)?;
+pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, ServiceDescriptorProto> {
+    // extract the service-level comments
+    // FIXME: parse these comments into leading + leading_detached
+    let (input, _) = many0(comment::parse)(input)?;
+
+    // consume the input up the start of the service definition
+    let (start, _) = take_until("service")(input)?;
+
+    // start recording the syntax statement's location
+    let location_record = input.extra.record_location_start(start, TAG);
+
+    // extract the identifier
+    let (input, identifier) =
+        preceded(tag("service"), super::identifier::parse_as(identifier::TAG))(start)?;
+
+    // consume methods until the service is finished
+    let (end, methods) = delimited(
+        tag("{"),
+        many0(method::parse),
+        preceded(multispace0, tag("}")),
+    )(input)?;
+
+    // finish recording the location
+    input.extra.record_location_end(location_record, end);
 
     Ok((
-        input,
+        end,
         ServiceDescriptorProto {
-            name: Some(name.to_string()),
+            name: Some(identifier.to_string()),
             method: methods,
-            // FIXME: handle the rest of these fields, too
+            // FIXME: handle the rest
             ..Default::default()
         },
     ))
@@ -64,6 +101,10 @@ pub(crate) fn parse(input: &str) -> IResult<&str, ServiceDescriptorProto> {
 
 #[cfg(test)]
 mod test {
+    use crate::parser::{
+        source::{LocationRecorder, State},
+        Span,
+    };
     use prost_types::{MethodDescriptorProto, ServiceDescriptorProto};
 
     #[test]
@@ -79,7 +120,11 @@ mod test {
         "#
         );
 
-        let service = ServiceDescriptorProto {
+        let locations = LocationRecorder::new();
+        let state = State::new(&locations);
+        let span = Span::new_extra(&input, state);
+
+        let expected = ServiceDescriptorProto {
             name: Some(name),
             method: vec![MethodDescriptorProto {
                 name: Some(method),
@@ -90,8 +135,8 @@ mod test {
             ..Default::default()
         };
 
-        let (_, result) = super::parse(&input).unwrap();
+        let (_, actual) = super::parse(span).unwrap();
 
-        assert_eq!(service, result);
+        assert_eq!(expected, actual);
     }
 }

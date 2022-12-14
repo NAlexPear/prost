@@ -1,3 +1,4 @@
+use super::Span;
 use nom::{
     bytes::complete::tag,
     character::{complete::multispace0, streaming::alpha1},
@@ -9,7 +10,7 @@ use nom::{
 use prost_types::{EnumDescriptorProto, EnumValueDescriptorProto};
 
 /// Parse an enum into an [`EnumDescriptorProto`]
-pub(crate) fn parse(input: &str) -> IResult<&str, EnumDescriptorProto> {
+pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, EnumDescriptorProto> {
     let (input, (_, _, _, name, _)) =
         tuple((multispace0, tag("enum"), multispace0, alpha1, multispace0))(input)?;
 
@@ -22,7 +23,7 @@ pub(crate) fn parse(input: &str) -> IResult<&str, EnumDescriptorProto> {
                 delimited(multispace0, nom::character::complete::i32, multispace0),
                 terminated(tag(";"), multispace0),
             )),
-            |(name, _, number, _): (&str, _, _, _)| {
+            |(name, _, number, _): (Span<'a>, _, _, _)| {
                 EnumValueDescriptorProto {
                     name: Some(name.to_string()),
                     number: Some(number),
@@ -46,6 +47,7 @@ pub(crate) fn parse(input: &str) -> IResult<&str, EnumDescriptorProto> {
 
 #[cfg(test)]
 mod test {
+    use crate::parser::source::{LocationRecorder, Span, State};
     use prost_types::{EnumDescriptorProto, EnumValueDescriptorProto};
 
     #[test]
@@ -59,6 +61,9 @@ mod test {
                    {second} = 1;
                }}"#
         );
+        let locations = LocationRecorder::new();
+        let state = State::new(&locations);
+        let span = Span::new_extra(&input, state);
         let enum_type = EnumDescriptorProto {
             name: Some(name),
             value: vec![
@@ -76,7 +81,7 @@ mod test {
             ..Default::default()
         };
 
-        let (_, result) = super::parse(&input).unwrap();
+        let (_, result) = super::parse(span).unwrap();
 
         assert_eq!(enum_type, result);
     }

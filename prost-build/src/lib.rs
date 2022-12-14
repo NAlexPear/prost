@@ -133,7 +133,7 @@ use std::env;
 use std::ffi::{OsStr, OsString};
 use std::fmt;
 use std::fs;
-use std::io::{Error, ErrorKind, Result, Write};
+use std::io::{Error, ErrorKind, Read, Result, Write};
 use std::ops::RangeToInclusive;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -254,6 +254,7 @@ pub struct Config {
     protoc_args: Vec<OsString>,
     disable_comments: PathMap<()>,
     skip_protoc_run: bool,
+    use_external_compiler: bool,
     include_file: Option<PathBuf>,
     prost_path: Option<String>,
     fmt: bool,
@@ -664,9 +665,8 @@ impl Config {
     }
 
     /// In combination with with `file_descriptor_set_path`, this can be used to provide a file
-    /// descriptor set as an input file, rather than having prost-build generate the file by calling
-    /// protoc.  Prost-build does require that the descriptor set was generated with
-    /// --include_source_info.
+    /// descriptor set as an input file, rather than having prost-build generate the file.
+    /// Prost-build does require that the descriptor set was generated with --include_source_info.
     ///
     /// In `build.rs`:
     ///
@@ -679,6 +679,23 @@ impl Config {
     ///
     pub fn skip_protoc_run(&mut self) -> &mut Self {
         self.skip_protoc_run = true;
+        self
+    }
+
+    /// Disables the use of a `protoc` executable from the environment, using the built-in file
+    /// descriptor compiler instead.
+    ///
+    /// In `build.rs`:
+    ///
+    /// ```rust
+    /// # let mut config = prost_build::Config::new();
+    /// config
+    ///     .disable_external_compiler()
+    ///     .compile_protos(&["src/items.proto"], &["src/"]);
+    /// ```
+    ///
+    pub fn disable_external_compiler(&mut self) -> &mut Self {
+        self.use_external_compiler = false;
         self
     }
 
@@ -846,72 +863,153 @@ impl Config {
             tmp.path().join("prost-descriptor-set")
         };
 
-        if !self.skip_protoc_run {
-            let protoc = protoc_from_env();
-
-            let mut cmd = Command::new(protoc.clone());
-            cmd.arg("--include_imports")
-                .arg("--include_source_info")
-                .arg("-o")
-                .arg(&file_descriptor_set_path);
-
-            for include in includes {
-                if include.as_ref().exists() {
-                    cmd.arg("-I").arg(include.as_ref());
-                } else {
-                    debug!(
-                        "ignoring {} since it does not exist.",
-                        include.as_ref().display()
-                    )
-                }
-            }
-
-            // Set the protoc include after the user includes in case the user wants to
-            // override one of the built-in .protos.
-            if let Some(protoc_include) = protoc_include_from_env() {
-                cmd.arg("-I").arg(protoc_include);
-            }
-
-            for arg in &self.protoc_args {
-                cmd.arg(arg);
-            }
-
-            for proto in protos {
-                cmd.arg(proto.as_ref());
-            }
-
-            debug!("Running: {:?}", cmd);
-
-            let output = cmd.output().map_err(|error| {
+        let file_descriptor_set = if self.skip_protoc_run {
+            // FIXME: share this in a free-standing function
+            let buf = fs::read(&file_descriptor_set_path).map_err(|e| {
                 Error::new(
-                    error.kind(),
-                    format!("failed to invoke protoc (hint: https://docs.rs/prost-build/#sourcing-protoc): (path: {:?}): {}", &protoc, error),
+                    e.kind(),
+                    format!(
+                        "unable to open file_descriptor_set_path: {:?}, OS: {}",
+                        &file_descriptor_set_path, e
+                    ),
                 )
             })?;
 
-            if !output.status.success() {
-                return Err(Error::new(
-                    ErrorKind::Other,
-                    format!("protoc failed: {}", String::from_utf8_lossy(&output.stderr)),
-                ));
-            }
-        }
+            FileDescriptorSet::decode(&*buf).map_err(|error| {
+                Error::new(
+                    ErrorKind::InvalidInput,
+                    format!("invalid FileDescriptorSet: {}", error),
+                )
+            })?
+        } else {
+            if self.use_external_compiler {
+                let protoc = protoc_from_env();
 
-        let buf = fs::read(&file_descriptor_set_path).map_err(|e| {
-            Error::new(
-                e.kind(),
-                format!(
-                    "unable to open file_descriptor_set_path: {:?}, OS: {}",
-                    &file_descriptor_set_path, e
-                ),
-            )
-        })?;
-        let file_descriptor_set = FileDescriptorSet::decode(&*buf).map_err(|error| {
-            Error::new(
-                ErrorKind::InvalidInput,
-                format!("invalid FileDescriptorSet: {}", error),
-            )
-        })?;
+                let mut cmd = Command::new(protoc.clone());
+                cmd.arg("--include_imports")
+                    .arg("--include_source_info")
+                    .arg("-o")
+                    .arg(&file_descriptor_set_path);
+
+                for include in includes {
+                    if include.as_ref().exists() {
+                        cmd.arg("-I").arg(include.as_ref());
+                    } else {
+                        debug!(
+                            "ignoring {} since it does not exist.",
+                            include.as_ref().display()
+                        )
+                    }
+                }
+
+                // Set the protoc include after the user includes in case the user wants to
+                // override one of the built-in .protos.
+                if let Some(protoc_include) = protoc_include_from_env() {
+                    cmd.arg("-I").arg(protoc_include);
+                }
+
+                for arg in &self.protoc_args {
+                    cmd.arg(arg);
+                }
+
+                for proto in protos {
+                    cmd.arg(proto.as_ref());
+                }
+
+                debug!("Running: {:?}", cmd);
+
+                let output = cmd.output().map_err(|error| {
+                    Error::new(
+                        error.kind(),
+                        format!("failed to invoke protoc (hint: https://docs.rs/prost-build/#sourcing-protoc): (path: {:?}): {}", &protoc, error),
+                    )
+                })?;
+
+                if !output.status.success() {
+                    return Err(Error::new(
+                        ErrorKind::Other,
+                        format!("protoc failed: {}", String::from_utf8_lossy(&output.stderr)),
+                    ));
+                }
+
+                let buf = fs::read(&file_descriptor_set_path).map_err(|e| {
+                    Error::new(
+                        e.kind(),
+                        format!(
+                            "unable to open file_descriptor_set_path: {:?}, OS: {}",
+                            &file_descriptor_set_path, e
+                        ),
+                    )
+                })?;
+
+                FileDescriptorSet::decode(&*buf).map_err(|error| {
+                    Error::new(
+                        ErrorKind::InvalidInput,
+                        format!("invalid FileDescriptorSet: {}", error),
+                    )
+                })?
+            } else {
+                let mut files = Vec::with_capacity(protos.len());
+
+                for proto in protos {
+                    let mut contents = Vec::new();
+                    let mut file_name = String::new();
+
+                    for include in includes {
+                        if proto.as_ref().starts_with(include) {
+                            if fs::File::open(&proto)
+                                .and_then(|mut file| file.read_to_end(&mut contents))
+                                .is_ok()
+                            {
+                                if let Some(name) = proto
+                                    .as_ref()
+                                    .strip_prefix(include)
+                                    .map_err(|error| {
+                                        Error::new(ErrorKind::NotFound, error.to_string())
+                                    })?
+                                    .to_str()
+                                {
+                                    file_name.push_str(name);
+                                }
+
+                                break;
+                            }
+                        }
+                    }
+
+                    if contents.is_empty() {
+                        return Err(Error::new(
+                            ErrorKind::NotFound,
+                            format!(
+                                "proto {:?} was either not found or was empty",
+                                proto.as_ref()
+                            ),
+                        ));
+                    }
+
+                    let input = String::from_utf8(contents)
+                        .map_err(|error| Error::new(ErrorKind::InvalidData, error.to_string()))?;
+
+                    let mut file_descriptor = parser::parse(&input)?;
+                    file_descriptor.name = Some(file_name);
+                    files.push(file_descriptor);
+                }
+
+                FileDescriptorSet { file: files }
+            }
+        };
+
+        println!(
+            "paths -> {:?}",
+            file_descriptor_set.file[0]
+                .source_code_info
+                .as_ref()
+                .unwrap()
+                .location
+                .iter()
+                .map(|location| location.path.clone())
+                .collect::<Vec<_>>()
+        );
 
         let requests = file_descriptor_set
             .file
@@ -1110,6 +1208,7 @@ impl default::Default for Config {
             protoc_args: Vec::new(),
             disable_comments: PathMap::default(),
             skip_protoc_run: false,
+            use_external_compiler: true,
             include_file: None,
             prost_path: None,
             fmt: true,
@@ -1399,6 +1498,34 @@ mod tests {
             .out_dir(std::env::temp_dir())
             .compile_protos(&["src/fixtures/smoke_test/smoke_test.proto"], &["src"])
             .unwrap();
+    }
+
+    #[test]
+    fn internal_external_smoke_test_parity() {
+        let _ = env_logger::try_init();
+        let external_compiler_out_dir = std::env::temp_dir().as_path().join("external");
+        let internal_compiler_out_dir = std::env::temp_dir().as_path().join("internal");
+
+        // For reproducibility, ensure we start with the out directories created and empty
+        let _ = fs::remove_dir_all(&external_compiler_out_dir);
+        let _ = fs::create_dir(&external_compiler_out_dir);
+        let _ = fs::remove_dir_all(&internal_compiler_out_dir);
+        let _ = fs::create_dir(&internal_compiler_out_dir);
+
+        Config::new()
+            .service_generator(Box::new(ServiceTraitGenerator))
+            .out_dir(external_compiler_out_dir)
+            .compile_protos(&["src/fixtures/smoke_test/smoke_test.proto"], &["src"])
+            .unwrap();
+
+        Config::new()
+            .service_generator(Box::new(ServiceTraitGenerator))
+            .disable_external_compiler()
+            .out_dir(internal_compiler_out_dir)
+            .compile_protos(&["src/fixtures/smoke_test/smoke_test.proto"], &["src"])
+            .unwrap();
+
+        panic!("FIXME: compare the outputs of the two generators");
     }
 
     #[test]
