@@ -55,7 +55,7 @@ pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, FileDescriptorProt
                 match statement {
                     Statement::Package(package) => {
                         if file_descriptor.package.is_some() {
-                            // FIXME: return a "duplicate package" error
+                            todo!("FIXME: return a 'duplicate package' error")
                         }
 
                         file_descriptor.package = Some(package.to_string());

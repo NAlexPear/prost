@@ -31,10 +31,8 @@ impl<'a> State<'a> {
     }
 
     /// start recording a location at a [`Span`], receiving a handle to that location for further updates
-    /// FIXME: encapsulate these methods in a parser combinator so that we never leave a dangler
     /// FIXME: make this recording fallible with a custom (internal) error type
-    /// FIXME: make this internal to the module!
-    pub(crate) fn record_location_start<T>(&self, start: Span<'a>, tag: T) -> LocationHandle
+    fn record_location_start<T>(&self, start: Span<'a>, tag: T) -> LocationHandle
     where
         T: Tag,
     {
@@ -70,7 +68,7 @@ impl<'a> State<'a> {
     }
 
     /// Consume a [`LocationHandle`] at a [`Span`]'s coordinates
-    pub(crate) fn record_location_end(&self, handle: LocationHandle, end: Span<'a>) {
+    fn record_location_end(&self, handle: LocationHandle, end: Span<'a>) {
         let end_line = (end.location_line() - 1) as i32;
         let end_column = (end.get_column() - 1) as i32;
         let span = &mut self.0.locations.borrow_mut()[handle.index].span;
@@ -84,11 +82,11 @@ impl<'a> State<'a> {
 
     #[cfg(test)]
     pub(crate) fn into_inner(&self) -> Vec<Location> {
-        self.0.locations.clone().into_inner()
+        self.0.clone().into_inner()
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub(crate) struct LocationRecorder {
     locations: RefCell<Vec<Location>>,
 }

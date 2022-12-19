@@ -20,7 +20,6 @@ use prost_types::{
 
 /// Path component for a [`Message`]
 /// derived from the `message_type` field's tag in [`FileDescriptorProto`]
-// FIXME: derive these tags directly from the FileDescriptorProto in prost_types
 #[derive(Clone, Copy)]
 struct TAG;
 
@@ -47,7 +46,6 @@ impl<'a> From<&'a TAG> for i32 {
 }
 
 /// Parse a message into a [`DescriptorProto`]
-// FIXME: implement Parser<DescriptorProto> for FileDescriptorProto
 pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, DescriptorProto> {
     locate(
         |input| {
@@ -141,7 +139,8 @@ mod field {
     /// Path component for a message field
     /// derived from the `field` field in [`DescriptorProto`];
     // FIXME: derive these tags directly from the DescriptorProto in prost_types
-    pub(super) struct TAG;
+    #[derive(Clone, Copy)]
+    struct TAG;
 
     impl Tag for TAG {
         fn into_path(&self, locations: &[Location]) -> Vec<i32> {
@@ -183,64 +182,59 @@ mod field {
         // FIXME: consume up to the start of the first alphanumeric
         let (start, _) = many0(tuple((comment::parse, multispace0)))(input)?;
 
-        // start recording the field's location
-        // FIXME: this way of recording locations doesn't allow for failure! we need to be able to
-        // unwind the location stack (or do we just need to filter on COMPLETE locations?)
-        let location_record = input.extra.record_location_start(start, TAG);
+        locate(
+            |input| {
+                // FIXME: divide these parsers up, recording locations more granularly
+                map(
+                    tuple((
+                        map_res(
+                            delimited(multispace0, alphanumeric1, multispace0),
+                            |type_: Span<'a>| {
+                                // FIXME: handle possible field types with an alt() instead of this
+                                let type_ = match type_.as_ref() {
+                                    "double" => Type::Double,
+                                    "float" => Type::Float,
+                                    "int64" => Type::Int64,
+                                    "uint64" => Type::Uint64,
+                                    "int32" => Type::Int32,
+                                    "fixed64" => Type::Fixed64,
+                                    "fixed32" => Type::Fixed32,
+                                    "bool" => Type::Bool,
+                                    "string" => Type::String,
+                                    "bytes" => Type::Bytes,
+                                    "uint32" => Type::Uint32,
+                                    "sfixed32" => Type::Sfixed32,
+                                    "sfixed64" => Type::Sfixed64,
+                                    "sint32" => Type::Sint32,
+                                    "sint64" => Type::Sint64,
+                                    _ => return Err(Error::new(input, ErrorKind::Fail)),
+                                };
 
-        // FIXME: divide these parsers up, recording locations more granularly
-        let (end, field) = map(
-            tuple((
-                map_res(
-                    delimited(multispace0, alphanumeric1, multispace0),
-                    |type_: Span<'a>| {
-                        // FIXME: handle possible field types with an alt() instead of this
-                        let type_ = match type_.as_ref() {
-                            "double" => Type::Double,
-                            "float" => Type::Float,
-                            "int64" => Type::Int64,
-                            "uint64" => Type::Uint64,
-                            "int32" => Type::Int32,
-                            "fixed64" => Type::Fixed64,
-                            "fixed32" => Type::Fixed32,
-                            "bool" => Type::Bool,
-                            "string" => Type::String,
-                            "bytes" => Type::Bytes,
-                            "uint32" => Type::Uint32,
-                            "sfixed32" => Type::Sfixed32,
-                            "sfixed64" => Type::Sfixed64,
-                            "sint32" => Type::Sint32,
-                            "sint64" => Type::Sint64,
-                            _ => return Err(Error::new(input, ErrorKind::Fail)),
-                        };
-
-                        Ok(type_)
+                                Ok(type_)
+                            },
+                        ),
+                        delimited(
+                            multispace0,
+                            take_till1(|character: char| character.is_whitespace()),
+                            multispace0,
+                        ),
+                        tag("="),
+                        delimited(multispace0, nom::character::complete::i32, multispace0),
+                        terminated(tag(";"), multispace0),
+                    )),
+                    |(type_, name, _, number, _): (_, Span<'a>, _, _, _)| {
+                        FieldDescriptorProto {
+                            name: Some(name.to_string()),
+                            number: Some(number),
+                            r#type: Some(type_ as i32),
+                            // FIXME: handle the rest of these fields, too
+                            ..Default::default()
+                        }
                     },
-                ),
-                delimited(
-                    multispace0,
-                    take_till1(|character: char| character.is_whitespace()),
-                    multispace0,
-                ),
-                tag("="),
-                delimited(multispace0, nom::character::complete::i32, multispace0),
-                terminated(tag(";"), multispace0),
-            )),
-            |(type_, name, _, number, _): (_, Span<'a>, _, _, _)| {
-                FieldDescriptorProto {
-                    name: Some(name.to_string()),
-                    number: Some(number),
-                    r#type: Some(type_ as i32),
-                    // FIXME: handle the rest of these fields, too
-                    ..Default::default()
-                }
+                )(input)
             },
-        )(start)?;
-
-        // finish recording the field
-        input.extra.record_location_end(location_record, end);
-
-        Ok((end, field))
+            TAG,
+        )(start)
     }
 }
 
@@ -324,24 +318,27 @@ mod test {
 
     #[test]
     fn generates_message_field_paths() {
+        let name = "Testing".to_string();
+        let first = "first_field".to_string();
+        let second = "second_field".to_string();
+        let input = format!(
+            r#"message {name} {{
+                   string {first} = 1;
+                   int32 {second} = 2;
+               }}"#
+        );
         let location_recorder = LocationRecorder::new();
         let state = State::new(&location_recorder);
-        let span = Span::new_extra("", state);
-        span.extra.record_location_start(span, ());
+        let span = Span::new_extra(&input, state);
 
         let expected = vec![
-            vec![],
-            vec![Into::<i32>::into(&super::TAG), 0],
-            vec![
-                Into::<i32>::into(&super::TAG),
-                0,
-                Into::<i32>::into(&super::identifier::TAG),
-            ],
+            vec![4, 0],
+            vec![4, 0, 1],
+            vec![4, 0, 2, 0],
+            vec![4, 0, 2, 1],
         ];
 
-        span.extra.record_location_start(span, super::TAG);
-        span.extra
-            .record_location_start(span, super::identifier::TAG);
+        super::parse(span).unwrap();
 
         let actual: Vec<_> = span
             .extra

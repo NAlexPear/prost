@@ -949,67 +949,55 @@ impl Config {
                     )
                 })?
             } else {
-                let mut files = Vec::with_capacity(protos.len());
+                let inputs = protos
+                    .into_iter()
+                    .map(|proto| {
+                        let mut contents = Vec::new();
+                        let mut file_name = String::new();
 
-                for proto in protos {
-                    let mut contents = Vec::new();
-                    let mut file_name = String::new();
-
-                    for include in includes {
-                        if proto.as_ref().starts_with(include) {
-                            if fs::File::open(&proto)
-                                .and_then(|mut file| file.read_to_end(&mut contents))
-                                .is_ok()
-                            {
-                                if let Some(name) = proto
-                                    .as_ref()
-                                    .strip_prefix(include)
-                                    .map_err(|error| {
-                                        Error::new(ErrorKind::NotFound, error.to_string())
-                                    })?
-                                    .to_str()
+                        for include in includes {
+                            if proto.as_ref().starts_with(include) {
+                                if fs::File::open(&proto)
+                                    .and_then(|mut file| file.read_to_end(&mut contents))
+                                    .is_ok()
                                 {
-                                    file_name.push_str(name);
-                                }
+                                    if let Some(name) = proto
+                                        .as_ref()
+                                        .strip_prefix(include)
+                                        .map_err(|error| {
+                                            Error::new(ErrorKind::NotFound, error.to_string())
+                                        })?
+                                        .to_str()
+                                    {
+                                        file_name.push_str(name);
+                                    }
 
-                                break;
+                                    break;
+                                }
                             }
                         }
-                    }
 
-                    if contents.is_empty() {
-                        return Err(Error::new(
-                            ErrorKind::NotFound,
-                            format!(
-                                "proto {:?} was either not found or was empty",
-                                proto.as_ref()
-                            ),
-                        ));
-                    }
+                        if contents.is_empty() {
+                            return Err(Error::new(
+                                ErrorKind::NotFound,
+                                format!(
+                                    "proto {:?} was either not found or was empty",
+                                    proto.as_ref()
+                                ),
+                            ));
+                        }
 
-                    let input = String::from_utf8(contents)
-                        .map_err(|error| Error::new(ErrorKind::InvalidData, error.to_string()))?;
+                        let input = String::from_utf8(contents).map_err(|error| {
+                            Error::new(ErrorKind::InvalidData, error.to_string())
+                        })?;
 
-                    let mut file_descriptor = parser::parse(&input)?;
-                    file_descriptor.name = Some(file_name);
-                    files.push(file_descriptor);
-                }
+                        Ok((std::fs::canonicalize(proto)?, (file_name, input)))
+                    })
+                    .collect::<Result<HashMap<_, _>>>()?;
 
-                FileDescriptorSet { file: files }
+                parser::parse(inputs)?
             }
         };
-
-        println!(
-            "paths -> {:?}",
-            file_descriptor_set.file[0]
-                .source_code_info
-                .as_ref()
-                .unwrap()
-                .location
-                .iter()
-                .map(|location| location.path.clone())
-                .collect::<Vec<_>>()
-        );
 
         let requests = file_descriptor_set
             .file
@@ -1512,20 +1500,27 @@ mod tests {
         let _ = fs::remove_dir_all(&internal_compiler_out_dir);
         let _ = fs::create_dir(&internal_compiler_out_dir);
 
+        // generate the two FileDescriptorSets
         Config::new()
             .service_generator(Box::new(ServiceTraitGenerator))
-            .out_dir(external_compiler_out_dir)
+            .out_dir(external_compiler_out_dir.clone())
             .compile_protos(&["src/fixtures/smoke_test/smoke_test.proto"], &["src"])
             .unwrap();
 
         Config::new()
             .service_generator(Box::new(ServiceTraitGenerator))
             .disable_external_compiler()
-            .out_dir(internal_compiler_out_dir)
+            .out_dir(internal_compiler_out_dir.clone())
             .compile_protos(&["src/fixtures/smoke_test/smoke_test.proto"], &["src"])
             .unwrap();
 
-        panic!("FIXME: compare the outputs of the two generators");
+        // read the FileDescriptorSets from the file system
+        let external_file_descriptor_set =
+            fs::read_to_string(external_compiler_out_dir.join("smoke_test.rs")).unwrap();
+        let internal_file_descriptor_set =
+            fs::read_to_string(internal_compiler_out_dir.join("smoke_test.rs")).unwrap();
+
+        assert_eq!(external_file_descriptor_set, internal_file_descriptor_set);
     }
 
     #[test]

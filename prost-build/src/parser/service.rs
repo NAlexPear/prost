@@ -1,6 +1,6 @@
 use super::{
     comment, method,
-    source::{Span, Tag},
+    source::{locate, Span, Tag},
 };
 use nom::{
     bytes::complete::{tag, take_until},
@@ -14,6 +14,7 @@ use prost_types::{source_code_info::Location, ServiceDescriptorProto};
 /// Path component for a [`Message`]
 /// derived from the `service` field's tag in [`FileDescriptorProto`]
 // FIXME: derive these tags directly from the FileDescriptorProto in prost_types
+#[derive(Clone, Copy)]
 pub(crate) struct TAG;
 
 impl Tag for TAG {
@@ -64,39 +65,36 @@ mod identifier {
 
 /// Parse a service into a [`ServiceDescriptorProto`]
 pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, ServiceDescriptorProto> {
-    // extract the service-level comments
+    // consume the input up the start of the service definition
     // FIXME: parse these comments into leading + leading_detached
     let (input, _) = many0(comment::parse)(input)?;
-
-    // consume the input up the start of the service definition
     let (start, _) = take_until("service")(input)?;
 
-    // start recording the syntax statement's location
-    let location_record = input.extra.record_location_start(start, TAG);
+    locate(
+        |input| {
+            // extract the identifier
+            let (input, identifier) =
+                preceded(tag("service"), super::identifier::parse_as(identifier::TAG))(input)?;
 
-    // extract the identifier
-    let (input, identifier) =
-        preceded(tag("service"), super::identifier::parse_as(identifier::TAG))(start)?;
+            // consume methods until the service is finished
+            let (end, methods) = delimited(
+                tag("{"),
+                many0(method::parse),
+                preceded(multispace0, tag("}")),
+            )(input)?;
 
-    // consume methods until the service is finished
-    let (end, methods) = delimited(
-        tag("{"),
-        many0(method::parse),
-        preceded(multispace0, tag("}")),
-    )(input)?;
-
-    // finish recording the location
-    input.extra.record_location_end(location_record, end);
-
-    Ok((
-        end,
-        ServiceDescriptorProto {
-            name: Some(identifier.to_string()),
-            method: methods,
-            // FIXME: handle the rest
-            ..Default::default()
+            Ok((
+                end,
+                ServiceDescriptorProto {
+                    name: Some(identifier.to_string()),
+                    method: methods,
+                    // FIXME: handle the rest
+                    ..Default::default()
+                },
+            ))
         },
-    ))
+        TAG,
+    )(start)
 }
 
 #[cfg(test)]

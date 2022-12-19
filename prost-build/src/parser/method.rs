@@ -1,4 +1,4 @@
-use super::source::{Span, Tag};
+use super::source::{locate, Span, Tag};
 use nom::{
     bytes::complete::{tag, take_until},
     character::complete::{multispace0, multispace1},
@@ -10,6 +10,7 @@ use prost_types::{source_code_info::Location, MethodDescriptorProto};
 /// Path component for a [`Method`]
 /// derived from the `method` field's tag in [`ServiceDescriptorProto`]
 // FIXME: derive these tags directly from the ServiceDescriptorProto in prost_types
+#[derive(Clone, Copy)]
 pub(crate) struct TAG;
 
 impl Tag for TAG {
@@ -127,43 +128,42 @@ pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, MethodDescriptorPr
     // consume the input up to the start of the rpc definition
     let (start, _) = take_until("rpc")(input)?;
 
-    // start recording the method's location
-    let location_record = input.extra.record_location_start(start, TAG);
+    locate(
+        |input| {
+            // extract the rpc Identifier
+            let (input, identifier) =
+                preceded(tag("rpc"), super::identifier::parse_as(identifier::TAG))(input)?;
 
-    // extract the rpc Identifier
-    let (input, identifier) =
-        preceded(tag("rpc"), super::identifier::parse_as(identifier::TAG))(start)?;
+            // extract the input and output types
+            let (end, (input_type, output_type)) = tuple((
+                terminated(
+                    delimited(
+                        tag("("),
+                        super::identifier::parse_as(input_type::TAG),
+                        tag(")"),
+                    ),
+                    delimited(multispace1, tag("returns"), multispace1),
+                ),
+                terminated(
+                    delimited(
+                        tag("("),
+                        super::identifier::parse_as(output_type::TAG),
+                        tag(")"),
+                    ),
+                    pair(multispace0, tag(";")),
+                ),
+            ))(input)?;
 
-    // extract the input and output types
-    let (end, (input_type, output_type)) = tuple((
-        terminated(
-            delimited(
-                tag("("),
-                super::identifier::parse_as(input_type::TAG),
-                tag(")"),
-            ),
-            delimited(multispace1, tag("returns"), multispace1),
-        ),
-        terminated(
-            delimited(
-                tag("("),
-                super::identifier::parse_as(output_type::TAG),
-                tag(")"),
-            ),
-            pair(multispace0, tag(";")),
-        ),
-    ))(input)?;
-
-    // finish recording the location
-    input.extra.record_location_end(location_record, end);
-
-    Ok((
-        end,
-        MethodDescriptorProto {
-            name: Some(identifier.to_string()),
-            input_type: Some(input_type.to_string()),
-            output_type: Some(output_type.to_string()),
-            ..Default::default()
+            Ok((
+                end,
+                MethodDescriptorProto {
+                    name: Some(identifier.to_string()),
+                    input_type: Some(input_type.to_string()),
+                    output_type: Some(output_type.to_string()),
+                    ..Default::default()
+                },
+            ))
         },
-    ))
+        TAG,
+    )(start)
 }
