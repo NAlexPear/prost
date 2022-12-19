@@ -1,7 +1,9 @@
-use nom::{character::complete::multispace0, IResult};
+use nom::{character::complete::multispace0, multi::many0, IResult};
 use nom_locate::LocatedSpan;
 use prost_types::source_code_info::Location;
 use std::cell::RefCell;
+
+use super::comment;
 
 pub(crate) const ROOT: () = ();
 
@@ -36,7 +38,6 @@ impl<'a> State<'a> {
     where
         T: Tag,
     {
-        // FIXME: delegate this logic to the location_recorder
         let start_line = (start.location_line() - 1) as i32;
         let start_column = (start.get_column() - 1) as i32;
 
@@ -64,6 +65,9 @@ impl<'a> State<'a> {
 
         LocationHandle {
             index: locations.len() - 1,
+            leading_detached_comments: Vec::new(),
+            leading_comments: None,
+            trailing_comments: None,
         }
     }
 
@@ -71,13 +75,31 @@ impl<'a> State<'a> {
     fn record_location_end(&self, handle: LocationHandle, end: Span<'a>) {
         let end_line = (end.location_line() - 1) as i32;
         let end_column = (end.get_column() - 1) as i32;
-        let span = &mut self.0.locations.borrow_mut()[handle.index].span;
 
-        if span[0] != end_line {
-            span.push(end_line);
+        if let Some(location) = &mut self.0.locations.borrow_mut().get_mut(handle.index) {
+            // propagate the comments
+            location.trailing_comments = handle.trailing_comments;
+            location.leading_comments = handle.leading_comments.map(String::from);
+            location.leading_detached_comments = handle
+                .leading_detached_comments
+                .into_iter()
+                .map(String::from)
+                .collect();
+
+            // adjust the span with ending columns
+            let span = &mut location.span;
+
+            if span[0] != end_line {
+                span.push(end_line);
+            }
+
+            span.push(end_column);
         }
+    }
 
-        span.push(end_column);
+    /// Consume a [`LocationHandle`] and remove its children from the stack
+    fn remove_location(&self, handle: LocationHandle) {
+        self.0.locations.borrow_mut().drain(handle.index..);
     }
 
     #[cfg(test)]
@@ -110,26 +132,48 @@ impl LocationRecorder {
 }
 
 /// Location-recording handle given out when `record_location_start` is called on [`State`]
-pub(crate) struct LocationHandle {
+pub(crate) struct LocationHandle<'a> {
     index: usize,
+    leading_detached_comments: Vec<&'a str>,
+    leading_comments: Option<&'a str>,
+    trailing_comments: Option<String>,
 }
 
 /// Generic location-tracking input for use in parsers
-// FIXME: implement state-mutating methods on Span<'a> through a trait
 pub(crate) type Span<'a> = LocatedSpan<&'a str, State<'a>>;
 
 /// Wrapper function for handling location for a parser
-pub(crate) fn locate<'a, T, F, O>(parser: F, tag: T) -> impl Fn(Span<'a>) -> IResult<Span<'a>, O>
+pub(crate) fn locate<'a, T, F, O>(
+    mut parser: F,
+    tag: T,
+) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, O>
 where
-    F: Fn(Span<'a>) -> IResult<Span<'a>, O>,
+    F: FnMut(Span<'a>) -> IResult<Span<'a>, O>,
     T: Tag + Copy,
 {
     move |input| {
-        // consume any preceding whitespace
-        let (start, _) = multispace0(input)?;
+        // parse leading comments
+        let (input, mut leading_detached_comments) = many0(comment::parse)(input)?;
+
+        // consume any additional preceding whitespace
+        let (start, leading_whitespace) = multispace0(input)?;
 
         // start recording the identifier's location
-        let location_record = input.extra.record_location_start(start, tag);
+        let mut location_record = input.extra.record_location_start(start, tag);
+
+        // check if the last leading comment was attached or not
+        if leading_whitespace
+            .lines()
+            .filter(|line| line.is_empty())
+            .count()
+            == 1
+        {
+            let leading_comments = leading_detached_comments.pop();
+            location_record.leading_comments = leading_comments;
+        }
+
+        // record the remaining comments as detached comments
+        location_record.leading_detached_comments = leading_detached_comments;
 
         // run the wrapped function
         match parser(start) {
@@ -144,7 +188,7 @@ where
                 Ok((remainder, output))
             }
             Err(error) => {
-                // FIXME: remove the location from the stack before forwarding the error
+                input.extra.remove_location(location_record);
                 Err(error)
             }
         }
@@ -153,14 +197,14 @@ where
 
 #[cfg(test)]
 mod test {
-    use super::{LocationRecorder, Span, State};
+    use super::{LocationRecorder, Span, State, ROOT};
 
     #[test]
     fn handles_root_path() {
         let location_recorder = LocationRecorder::new();
         let state = State::new(&location_recorder);
         let span = Span::new_extra("", state);
-        span.extra.record_location_start(span, ());
+        span.extra.record_location_start(span, ROOT);
 
         let expected = Vec::<i32>::new();
         let actual = &span.extra.0.locations.borrow()[0].path;

@@ -3,8 +3,7 @@ use super::{
     source::{locate, Span, Tag},
 };
 use nom::{
-    bytes::complete::{tag, take_until},
-    character::complete::multispace0,
+    bytes::complete::tag,
     multi::many0,
     sequence::{delimited, preceded},
     IResult,
@@ -65,11 +64,6 @@ mod identifier {
 
 /// Parse a service into a [`ServiceDescriptorProto`]
 pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, ServiceDescriptorProto> {
-    // consume the input up the start of the service definition
-    // FIXME: parse these comments into leading + leading_detached
-    let (input, _) = many0(comment::parse)(input)?;
-    let (start, _) = take_until("service")(input)?;
-
     locate(
         |input| {
             // extract the identifier
@@ -80,7 +74,8 @@ pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, ServiceDescriptorP
             let (end, methods) = delimited(
                 tag("{"),
                 many0(method::parse),
-                preceded(multispace0, tag("}")),
+                // FIXME: register these last comments as trailing comments
+                preceded(many0(comment::parse), tag("}")),
             )(input)?;
 
             Ok((
@@ -94,7 +89,7 @@ pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, ServiceDescriptorP
             ))
         },
         TAG,
-    )(start)
+    )(input)
 }
 
 #[cfg(test)]

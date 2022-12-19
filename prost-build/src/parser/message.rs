@@ -49,8 +49,6 @@ impl<'a> From<&'a TAG> for i32 {
 pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, DescriptorProto> {
     locate(
         |input| {
-            // FIXME: handle comments throughout
-
             // extract the identifier
             let (input, identifier) = preceded(
                 terminated(tag("message"), multispace1),
@@ -93,8 +91,10 @@ pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, DescriptorProto> {
 
             let (input, _) = statements.finish()?;
 
-            // consume the closing statement bracket
-            let (end, _) = preceded(multispace0, tag("}"))(input)?;
+            // consume remaining comments and the closing statement bracket
+            // FIXME: register as trailing comments
+            let (end, _) = many0(comment::parse)(input)?;
+            let (end, _) = preceded(multispace0, tag("}"))(end)?;
 
             Ok((end, descriptor))
         },
@@ -178,10 +178,6 @@ mod field {
 
     /// parse a single message field
     pub(super) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, FieldDescriptorProto> {
-        // FIXME: handle comments throughout
-        // FIXME: consume up to the start of the first alphanumeric
-        let (start, _) = many0(tuple((comment::parse, multispace0)))(input)?;
-
         locate(
             |input| {
                 // FIXME: divide these parsers up, recording locations more granularly
@@ -234,7 +230,7 @@ mod field {
                 )(input)
             },
             TAG,
-        )(start)
+        )(input)
     }
 }
 

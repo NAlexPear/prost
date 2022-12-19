@@ -1,4 +1,5 @@
 use super::{
+    comment,
     import::{self, Import},
     message,
     package::{self, Package},
@@ -9,6 +10,7 @@ use super::{
 use nom::{
     branch::alt,
     combinator::{iterator, map},
+    multi::many0,
     IResult,
 };
 use prost_types::{
@@ -70,6 +72,9 @@ pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, FileDescriptorProt
             }
 
             let (end, _) = statements.finish()?;
+
+            // consume and ignore any remaining comments
+            let (end, _) = many0(comment::parse)(end)?;
 
             Ok((end, file_descriptor))
         },

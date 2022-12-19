@@ -1,6 +1,6 @@
 use super::source::{locate, Span, Tag};
 use nom::{
-    bytes::complete::{tag, take_until},
+    bytes::complete::tag,
     character::complete::{multispace0, multispace1},
     sequence::{delimited, pair, preceded, terminated, tuple},
     IResult,
@@ -36,7 +36,7 @@ impl Tag for TAG {
                 path.push(index + 1);
                 path
             }
-            _ => todo!("FIXME: failed to account for a path in {parent:?}"),
+            _ => Vec::new(), // this generates an invalid recording
         }
     }
 }
@@ -123,11 +123,6 @@ mod output_type {
 
 /// Parse an rpc into a [`Method`]
 pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, MethodDescriptorProto> {
-    // FIXME: handle comments, whitespace, and location registration
-
-    // consume the input up to the start of the rpc definition
-    let (start, _) = take_until("rpc")(input)?;
-
     locate(
         |input| {
             // extract the rpc Identifier
@@ -165,5 +160,5 @@ pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, MethodDescriptorPr
             ))
         },
         TAG,
-    )(start)
+    )(input)
 }

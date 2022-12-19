@@ -3,7 +3,7 @@ use super::{
     Span,
 };
 use nom::{
-    bytes::complete::{tag, take_till1, take_until},
+    bytes::complete::{tag, take_till1},
     character::complete::multispace1,
     combinator::map,
     sequence::{delimited, pair, preceded},
@@ -47,28 +47,21 @@ impl<'a> Display for Import<'a> {
 
 /// Parse a standard (not weak or public) import statement/dependency
 pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, Import<'a>> {
+    // FIXME: handle comments and weak/public dependencies
+
+    // extract the import value
     locate(
-        |input| {
-            // FIXME: hand comments and weak/public dependencies
-
-            // consume the input up the start of the import statement
-            let (start, _) = take_until("import")(input)?;
-
-            // extract the import value
-            let (end, import) = preceded(
-                pair(tag("import"), multispace1),
-                delimited(
-                    tag("\""),
-                    map(
-                        take_till1(|character: char| character == '"' || character.is_whitespace()),
-                        |import: Span<'a>| Import::new(&import),
-                    ),
-                    tag("\";"),
+        preceded(
+            pair(tag("import"), multispace1),
+            delimited(
+                tag("\""),
+                map(
+                    take_till1(|character: char| character == '"' || character.is_whitespace()),
+                    |import: Span<'a>| Import::new(&import),
                 ),
-            )(start)?;
-
-            Ok((end, import))
-        },
+                tag("\";"),
+            ),
+        ),
         TAG,
     )(input)
 }

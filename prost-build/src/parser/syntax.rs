@@ -4,7 +4,7 @@ use super::{
 };
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_until},
+    bytes::complete::tag,
     character::complete::multispace1,
     combinator::value,
     sequence::{delimited, preceded, tuple},
@@ -50,28 +50,17 @@ impl Display for Syntax {
 /// Parse the file's required syntax statement (i.e. `proto2` or `proto3`)
 pub(crate) fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, Syntax> {
     locate(
-        |input| {
-            // FIXME: handle comments throughout
-            // FIXME: don't skip anything but whitespace or comments!
-
-            // consume the input up the start of the syntax definition
-            let (start, _) = take_until("syntax")(input)?;
-
-            // extract the syntax
-            let (end, syntax) = preceded(
-                tuple((tag("syntax"), multispace1, tag("="), multispace1)),
-                delimited(
-                    tag("\""),
-                    alt((
-                        value(Syntax::Proto2, tag("proto2")),
-                        value(Syntax::Proto3, tag("proto3")),
-                    )),
-                    tag("\";"),
-                ),
-            )(start)?;
-
-            Ok((end, syntax))
-        },
+        preceded(
+            tuple((tag("syntax"), multispace1, tag("="), multispace1)),
+            delimited(
+                tag("\""),
+                alt((
+                    value(Syntax::Proto2, tag("proto2")),
+                    value(Syntax::Proto3, tag("proto3")),
+                )),
+                tag("\";"),
+            ),
+        ),
         TAG,
     )(input)
 }

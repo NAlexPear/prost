@@ -24,16 +24,14 @@ impl<'a> Display for Identifier<'a> {
 fn parse<'a>(input: Span<'a>) -> IResult<Span<'a>, Identifier<'a>> {
     // extract and verify the Identifier
     // FIXME: use verify() to enforce message ident naming conventions
-    let (end, identifier) = map(
+    map(
         take_till1(|character: char| !(character.is_alphabetic() || character == '.')),
         Identifier::new,
-    )(input)?;
-
-    Ok((end, identifier))
+    )(input)
 }
 
 /// Wrapper function for generating a located identifier parser with a Tag
-pub(crate) fn parse_as<'a, T>(tag: T) -> impl Fn(Span<'a>) -> IResult<Span<'a>, Identifier<'a>>
+pub(crate) fn parse_as<'a, T>(tag: T) -> impl FnMut(Span<'a>) -> IResult<Span<'a>, Identifier<'a>>
 where
     T: Tag + Copy,
 {
